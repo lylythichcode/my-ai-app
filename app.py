@@ -10,13 +10,9 @@ st.set_page_config(page_title="SmartTAB - Quản lý công việc AI", layout="w
 # CSS để làm giao diện giống bản React của bạn
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007bff; color: white; }
-    .task-card { background-color: white; padding: 15px; border-radius: 10px; border-left: 5px solid #007bff; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    footer {text-align: center; color: #6c757d; margin-top: 50px;}
+    ...
     </style>
-    """, unsafe_allow_state_key=True)
-
+    """, unsafe_allow_html=True) # 
 # --- 2. CẤU HÌNH AI (Lấy từ Google AI Studio) ---
 api_key = os.environ.get("GEMINI_API_KEY")
 if api_key:

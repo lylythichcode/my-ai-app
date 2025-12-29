@@ -1,120 +1,119 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import google.generativeai as genai
 import os
 
-# --- 1. CẤU HÌNH GIAO DIỆN ---
-st.set_page_config(page_title="SmartTAB - Quản lý công việc AI", layout="wide")
+# --- 1. CẤU HÌNH TRANG & GIAO DIỆN (CSS) ---
+st.set_page_config(page_title="SmartTAB - Quản lý công việc", layout="centered")
 
-# CSS để làm giao diện giống bản React của bạn
 st.markdown("""
     <style>
-    ...
+    .stApp { background-color: #f8fbff; }
+    .main-card { background-color: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .footer { text-align: center; color: #888; font-size: 0.8em; margin-top: 50px; }
+    .priority-high { border-left: 5px solid #ff4b4b; padding-left: 10px; }
+    .priority-medium { border-left: 5px solid #ffa500; padding-left: 10px; }
+    .priority-low { border-left: 5px solid #28a745; padding-left: 10px; }
+    .task-done { text-decoration: line-through; color: #adb5bd; }
     </style>
-    """, unsafe_allow_html=True) # 
-# --- 2. CẤU HÌNH AI (Lấy từ Google AI Studio) ---
-api_key = os.environ.get("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
-    # Đây là nơi bạn dán System Instruction từ Studio
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        system_instruction="Bạn là trợ lý ảo SmartTAB. Hãy giúp người dùng tóm tắt công việc hoặc đưa ra lời khuyên năng suất dựa trên danh sách task."
-    )
+    """, unsafe_allow_html=True)
 
-# --- 3. QUẢN LÝ DỮ LIỆU (Thay cho LocalStorage) ---
+# --- 2. QUẢN LÝ TRẠNG THÁI (SESSION STATE) ---
 if 'tasks' not in st.session_state:
     st.session_state.tasks = []
-
 if 'show_app' not in st.session_state:
     st.session_state.show_app = False
+if 'onboarding_complete' not in st.session_state:
+    st.session_state.onboarding_complete = False
+
+# --- 3. LOGIC XỬ LÝ (DỊCH TỪ REACT) ---
+def add_task(title, priority, due_date):
+    new_task = {
+        "id": str(datetime.now().timestamp()),
+        "title": title,
+        "priority": priority,
+        "due_date": due_date,
+        "completed": False
+    }
+    st.session_state.tasks.append(new_task)
 
 # --- 4. GIAO DIỆN LANDING PAGE ---
 if not st.session_state.show_app:
-    st.title("🚀 SmartTAB")
-    st.subheader("Hệ thống quản lý công việc thông minh")
-    st.write("Sử dụng AI để tối ưu hóa hiệu suất làm việc của bạn.")
-    if st.button("Bắt đầu ngay"):
+    st.markdown("<h1 style='text-align: center; color: #1e90ff;'>🚀 SmartTAB</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Chào mừng bạn đến với hệ thống quản lý công việc thông minh.</p>", unsafe_allow_html=True)
+    if st.button("Bắt đầu ngay", use_container_width=True):
         st.session_state.show_app = True
         st.rerun()
     st.stop()
 
-# --- 5. GIAO DIỆN APP CHÍNH ---
-st.sidebar.title("SmartTAB Menu")
-view = st.sidebar.radio("Chế độ xem", ["Danh sách", "Lịch", "Phân tích AI"])
+# --- 5. GIAO DIỆN ONBOARDING (HƯỚNG DẪN) ---
+if not st.session_state.onboarding_complete:
+    st.info("💡 **Hướng dẫn nhanh:** Bạn có thể thêm công việc, chọn độ ưu tiên và để AI tư vấn cách hoàn thành hiệu quả nhất!")
+    if st.button("Tôi đã hiểu"):
+        st.session_state.onboarding_complete = True
+        st.rerun()
+    st.stop()
 
-if st.sidebar.button("Thoát App"):
-    st.session_state.show_app = False
-    st.rerun()
+# --- 6. ỨNG DỤNG CHÍNH ---
+st.markdown("<h1 style='text-align: center; color: #1e90ff;'>SmartTAB</h1>", unsafe_allow_html=True)
 
-st.title("📝 Danh sách công việc")
+# Switch View (Chuyển đổi Lịch/Danh sách)
+view = st.radio("Chế độ xem", ["📋 Danh sách", "📅 Lịch & AI"], horizontal=True)
 
-# Form thêm Task mới (TaskForm)
-with st.expander("➕ Thêm công việc mới", expanded=True):
-    with st.form("task_form"):
-        title = st.text_input("Tên công việc")
-        col1, col2 = st.columns(2)
-        with col1:
-            priority = st.selectbox("Độ ưu tiên", ["High", "Medium", "Low"])
-        with col2:
-            due_date = st.date_input("Hạn chót")
-        
-        submit = st.form_submit_button("Thêm vào danh sách")
-        if submit and title:
-            new_task = {
-                "id": len(st.session_state.tasks) + 1,
-                "title": title,
-                "priority": priority,
-                "due_date": due_date,
-                "completed": False
-            }
-            st.session_state.tasks.append(new_task)
-            st.success("Đã thêm!")
+if view == "📋 Danh sách":
+    # Form thêm Task
+    with st.markdown("<div class='main-card'>", unsafe_allow_html=True):
+        with st.form("task_form", clear_on_submit=True):
+            t_title = st.text_input("Tên công việc", placeholder="Nhập việc cần làm...")
+            col1, col2 = st.columns(2)
+            t_priority = col1.selectbox("Ưu tiên", ["High", "Medium", "Low"])
+            t_date = col2.date_input("Hạn chót", value=date.today())
+            if st.form_submit_button("+ Thêm công việc") and t_title:
+                add_task(t_title, t_priority, t_date)
+                st.toast("Đã thêm công việc!")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# Filter & Search (FilterControls)
-search = st.text_input("🔍 Tìm kiếm công việc...")
-sort_opt = st.selectbox("Sắp xếp theo", ["Mặc định", "Độ ưu tiên", "Hạn chót"])
+    # Bộ lọc & Tìm kiếm
+    search = st.text_input("🔍 Tìm kiếm công việc...")
+    
+    # Hiển thị danh sách
+    st.write("### Công việc của bạn")
+    for i, task in enumerate(st.session_state.tasks):
+        if search.lower() in task['title'].lower():
+            p_class = f"priority-{task['priority'].lower()}"
+            with st.container():
+                c1, c2, c3 = st.columns([1, 8, 1])
+                is_done = c1.checkbox("", value=task['completed'], key=f"check_{task['id']}")
+                st.session_state.tasks[i]['completed'] = is_done
+                
+                title_html = f"<span class='task-done'>{task['title']}</span>" if is_done else task['title']
+                c2.markdown(f"<div class='{p_class}'>{title_html} <br><small>📅 {task['due_date']}</small></div>", unsafe_allow_html=True)
+                
+                if c3.button("🗑️", key=f"del_{task['id']}"):
+                    st.session_state.tasks.pop(i)
+                    st.rerun()
 
-# Xử lý Logic Lọc và Sắp xếp
-tasks_to_show = st.session_state.tasks
-if search:
-    tasks_to_show = [t for t in tasks_to_show if search.lower() in t['title'].lower()]
-
-# Hiển thị Task (TaskList)
-if view == "Danh sách":
-    for idx, task in enumerate(tasks_to_show):
-        with st.container():
-            col_check, col_text, col_del = st.columns([1, 8, 1])
-            is_done = col_check.checkbox("", value=task['completed'], key=f"check_{idx}")
-            st.session_state.tasks[idx]['completed'] = is_done
-            
-            # Gạch ngang chữ nếu đã hoàn thành
-            display_title = f"~~{task['title']}~~" if is_done else task['title']
-            col_text.markdown(f"**{display_title}** | 📅 {task['due_date']} | 🚩 {task['priority']}")
-            
-            if col_del.button("🗑️", key=f"del_{idx}"):
-                st.session_state.tasks.pop(idx)
-                st.rerun()
-            st.markdown("---")
-
-elif view == "Lịch":
+else:
+    # Chế độ Lịch & AI
     if st.session_state.tasks:
         df = pd.DataFrame(st.session_state.tasks)
-        st.write("Các công việc sắp tới:")
-        st.table(df[['due_date', 'title', 'priority']])
+        st.write("### 📅 Lịch trình sắp tới")
+        st.dataframe(df[['due_date', 'title', 'priority']], use_container_width=True)
+        
+        st.write("### 🤖 Trợ lý AI Tư vấn")
+        if st.button("Phân tích danh sách với Gemini"):
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if api_key:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                prompt = f"Dựa trên danh sách task sau: {str(st.session_state.tasks)}. Hãy đưa ra lời khuyên để tối ưu năng suất."
+                response = model.generate_content(prompt)
+                st.info(response.text)
+            else:
+                st.error("Lỗi: Chưa có API Key!")
     else:
-        st.info("Chưa có công việc nào.")
+        st.info("Hãy thêm công việc để xem lịch và nhận tư vấn AI.")
 
-elif view == "Phân tích AI":
-    st.subheader("🤖 Trợ lý AI SmartTAB")
-    if st.button("Phân tích danh sách task của tôi"):
-        if api_key and st.session_state.tasks:
-            content = f"Danh sách task: {str(st.session_state.tasks)}"
-            with st.spinner("AI đang đọc danh sách..."):
-                response = model.generate_content(f"Hãy tóm tắt và đưa ra lời khuyên cho danh sách này: {content}")
-                st.write(response.text)
-        else:
-            st.warning("Vui lòng cấu hình API Key hoặc thêm Task để AI phân tích.")
-
-st.markdown("<footer>Create by Hailyngvn</footer>", unsafe_allow_state_key=True)
+# Footer
+st.markdown("<div class='footer'>Create by Hailyngvn</div>", unsafe_allow_html=True)
